@@ -1,0 +1,17 @@
+* { box-sizing: border-box; }
+body { margin: 0; background: #f4f1eb; color: #373340; font: 16px/1.7 system-ui, sans-serif; }
+main { max-width: 640px; margin: 7vh auto; padding: 32px; background: #fffdf8; border: 1px solid #ded7cd; border-radius: 16px; }
+small { color: #776c86; }
+h1 { font-size: 28px; margin: 8px 0; }
+p { color: #716c76; }
+dl { display: grid; grid-template-columns: 90px 1fr; background: #ece8ef; padding: 16px; border-radius: 8px; font-size: 14px; }
+dt { color: #74677e; }
+dd { margin: 0; overflow-wrap: anywhere; }
+label { display: block; font-weight: 600; margin: 24px 0 8px; }
+textarea { width: 100%; padding: 14px; min-height: 170px; border: 1px solid #c9c0d2; border-radius: 8px; font: inherit; resize: vertical; background: white; }
+textarea:focus { outline: 2px solid #a392bd; }
+button { margin-top: 20px; background: #75608f; color: white; border: 0; border-radius: 8px; padding: 12px 26px; font: inherit; cursor: pointer; }
+button:disabled { opacity: .55; cursor: default; }
+#result { white-space: pre-wrap; margin-top: 18px; overflow-wrap: anywhere; }
+footer { margin-top: 28px; border-top: 1px solid #e6dfd5; padding-top: 16px; color: #827a87; font-size: 12px; }
+@media (max-width: 680px) { main { margin: 20px 14px; padding: 24px; } }
