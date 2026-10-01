@@ -38,18 +38,20 @@ form.addEventListener('submit', async event => {
   try {
     const response = await fetch(submitUrl, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', apikey: window.FEEDBACK_CONFIG.publishableKey },
       body: JSON.stringify({ requestId, description, context }),
       signal: AbortSignal.timeout(20000)
     });
     const data = await response.json();
-    if (!response.ok || !Number.isSafeInteger(data.number) || data.number < 1) throw new Error('提交未确认');
+    if (!response.ok) throw new Error(data.error || '未能确认提交成功，请稍后重试。');
+    if (!Number.isSafeInteger(data.number) || data.number < 1) throw new Error('未能确认提交成功，请稍后重试。');
     result.style.color = '#466449';
     result.textContent = '提交成功，问题编号：#' + data.number + '。开发者已收到。';
     form.hidden = true;
-  } catch {
+  } catch (error) {
     result.style.color = '#9b4040';
-    result.textContent = '未能确认提交成功，请检查网络后重试。你的文字已保留。';
+    result.textContent = (error.name === 'TimeoutError' || error.name === 'TypeError'
+      ? '未能确认提交成功，请检查网络后重试。' : error.message) + ' 你的文字已保留。';
     button.disabled = false;
     button.textContent = '重新提交';
   }
