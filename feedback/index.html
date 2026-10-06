@@ -7,7 +7,7 @@
   <title>GuildWar · 玩家反馈</title>
   <link rel="stylesheet" href="style.css">
   <script src="config.js?v=20261001-submit" defer></script>
-  <script src="app.js?v=20261006-suggestions" defer></script>
+  <script src="app.js?v=20261006-system-info" defer></script>
 </head>
 <body>
   <main>
@@ -15,6 +15,10 @@
     <h1>遇到了什么问题？</h1>
     <p>描述发生了什么，以及之前做了什么。环境信息已自动填写。</p>
     <dl id="context"></dl>
+    <details id="system-info" hidden>
+      <summary>设备信息（自动附带）</summary>
+      <dl id="system-info-fields"></dl>
+    </details>
     <p id="availability" role="status"></p>
     <form id="form">
       <label for="description">问题描述</label>
