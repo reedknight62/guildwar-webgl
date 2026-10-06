@@ -8,8 +8,10 @@ dl { display: grid; grid-template-columns: 90px 1fr; background: #ece8ef; paddin
 dt { color: #74677e; }
 dd { margin: 0; overflow-wrap: anywhere; }
 label { display: block; font-weight: 600; margin: 24px 0 8px; }
-textarea { width: 100%; padding: 14px; min-height: 170px; border: 1px solid #c9c0d2; border-radius: 8px; font: inherit; resize: vertical; background: white; }
-textarea:focus { outline: 2px solid #a392bd; }
+textarea, input { width: 100%; padding: 14px; border: 1px solid #c9c0d2; border-radius: 8px; font: inherit; background: white; }
+textarea { min-height: 170px; resize: vertical; }
+textarea:focus, input:focus { outline: 2px solid #a392bd; }
+#qq-note { margin: 8px 0 0; font-size: 13px; }
 button { margin-top: 20px; background: #75608f; color: white; border: 0; border-radius: 8px; padding: 12px 26px; font: inherit; cursor: pointer; }
 button:disabled { opacity: .55; cursor: default; }
 #result { white-space: pre-wrap; margin-top: 18px; overflow-wrap: anywhere; }

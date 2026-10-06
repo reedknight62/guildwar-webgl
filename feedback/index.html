@@ -5,9 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="referrer" content="no-referrer">
   <title>GuildWar · 玩家反馈</title>
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="style.css?v=20261006-contact">
   <script src="config.js?v=20261001-submit" defer></script>
-  <script src="app.js?v=20261006-system-info" defer></script>
+  <script src="app.js?v=20261006-contact" defer></script>
 </head>
 <body>
   <main>
@@ -23,6 +23,9 @@
     <form id="form">
       <label for="description">问题描述</label>
       <textarea id="description" required maxlength="4000" placeholder="例如：进入仓库后点击存入，物品没有移动，也没有提示。"></textarea>
+      <label for="qq">QQ号（选填）</label>
+      <input id="qq" type="text" inputmode="numeric" maxlength="20" pattern="[0-9]{1,20}" autocomplete="off" aria-describedby="qq-note" placeholder="可留空">
+      <p id="qq-note">方便联系你；填写后会随反馈公开展示。</p>
       <button id="submit" type="submit" disabled>暂未开通提交</button>
     </form>
     <div id="result" role="status" aria-live="polite"></div>

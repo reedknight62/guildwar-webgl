@@ -34,6 +34,7 @@ const form = document.querySelector('#form');
 const button = document.querySelector('#submit');
 const result = document.querySelector('#result');
 const input = document.querySelector('#description');
+const qqInput = document.querySelector('#qq');
 let submitUrl = null;
 try {
   const configured = window.FEEDBACK_CONFIG?.submitUrl;
@@ -52,15 +53,22 @@ form.addEventListener('submit', async event => {
   if (!submitUrl) { result.textContent = '提交服务尚未接通，你的文字没有上传。'; return; }
   const description = input.value.trim();
   if (!description) { result.textContent = '请先描述遇到的问题。'; return; }
+  const qq = qqInput.value.trim();
+  if (qq && !/^[0-9]{1,20}$/.test(qq)) {
+    result.textContent = 'QQ号请填写数字，或留空。';
+    qqInput.focus();
+    return;
+  }
   button.disabled = true;
   input.readOnly = true;
+  qqInput.readOnly = true;
   button.textContent = '正在提交…';
   result.textContent = '';
   try {
     const response = await fetch(submitUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', apikey: window.FEEDBACK_CONFIG.publishableKey },
-      body: JSON.stringify({ requestId, description, context, systemInfo }),
+      body: JSON.stringify({ requestId, description, context, systemInfo, qq }),
       signal: AbortSignal.timeout(20000)
     });
     const data = await response.json();
