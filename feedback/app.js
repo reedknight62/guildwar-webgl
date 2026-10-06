@@ -1,7 +1,7 @@
 'use strict';
 const params = new URLSearchParams(location.search);
 const context = {};
-for (const [key, label] of [['version', '游戏版本'], ['build', '构建编号'], ['platform', '平台'], ['stage', '当前关卡'], ['screen', '所在界面']]) {
+for (const [key, label] of [['version', '游戏版本'], ['build', '构建编号'], ['platform', '平台']]) {
   context[key] = (params.get(key) || '未提供').slice(0, 120);
   const term = document.createElement('dt');
   const value = document.createElement('dd');
