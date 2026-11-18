@@ -81,8 +81,94 @@
       var script = document.createElement("script");
       script.src = loaderUrl;
       script.onload = () => {
+function installGithubChunkTransport(url, manifest) {
+  const dataUrl = new URL(url, document.baseURI).href;
+  const originalFetch = window.fetch;
+  const fetchResource = originalFetch.bind(window);
+  const size = manifest.originalSize;
+  const chunks = manifest.chunks;
+  if (!Number.isSafeInteger(size) || size <= 0 || !Array.isArray(chunks) ||
+      !chunks.length || !chunks.every(part => /^\d+$/.test(String(part)))) {
+    throw new Error('Invalid build chunk manifest');
+  }
+  const etag = '"' + new URL(dataUrl).pathname.split('/').pop() + '"';
+  const headers = {
+    'Content-Type': 'application/octet-stream',
+    'Content-Length': String(size),
+    'ETag': etag
+  };
+
+  function chunkFetch(input, options) {
+    const requestedUrl = input instanceof Request ? input.url : new URL(input, document.baseURI).href;
+    if (requestedUrl !== dataUrl) return fetchResource(input, options);
+    const request = new Request(input, options);
+    if (request.method !== 'GET' && request.method !== 'HEAD') return fetchResource(input, options);
+    if (request.signal.aborted) return Promise.reject(new DOMException('Aborted', 'AbortError'));
+    const conditional = request.headers.get('If-None-Match');
+    if (conditional && conditional.split(',').some(value => [etag, 'W/' + etag, '*'].includes(value.trim()))) {
+      return Promise.resolve(new Response(null, {status: 304, headers}));
+    }
+    if (request.method === 'HEAD') return Promise.resolve(new Response(null, {headers}));
+
+    let reader = null;
+    let next = 0;
+    let received = 0;
+    let cancelled = false;
+    const stream = new ReadableStream({
+      async pull(controller) {
+        try {
+          while (!cancelled) {
+            if (!reader) {
+              if (next === chunks.length) {
+                if (received !== size) throw new Error('Incomplete build data');
+                controller.close();
+                return;
+              }
+              const response = await fetchResource(dataUrl + '.' + chunks[next++], {
+                cache: request.cache,
+                credentials: request.credentials,
+                signal: request.signal
+              });
+              if (cancelled) {
+                if (response.body) await response.body.cancel();
+                return;
+              }
+              if (!response.ok || !response.body) throw new Error('Build chunk request failed: ' + response.status);
+              reader = response.body.getReader();
+            }
+            const part = await reader.read();
+            if (cancelled) return;
+            if (part.done) {
+              reader.releaseLock();
+              reader = null;
+              continue;
+            }
+            received += part.value.byteLength;
+            if (received > size) throw new Error('Build data exceeds manifest size');
+            controller.enqueue(part.value);
+            return;
+          }
+        } catch (error) {
+          if (reader) await reader.cancel(error).catch(() => {});
+          if (!cancelled) controller.error(error);
+        }
+      },
+      cancel(reason) {
+        cancelled = true;
+        return reader ? reader.cancel(reason) : undefined;
+      }
+    });
+    return Promise.resolve(new Response(stream, {headers}));
+  }
+
+  window.fetch = chunkFetch;
+  return function restore() {
+    if (window.fetch === chunkFetch) window.fetch = originalFetch;
+  };
+}
+
         function startUnity(cfg) {
-          createUnityInstance(canvas, cfg, (progress) => {
+          return createUnityInstance(canvas, cfg, (progress) => {
             progressBarFull.style.width = 100 * progress + "%";
           }).then((unityInstance) => {
             loadingBar.style.display = "none";
@@ -93,17 +179,13 @@
             alert(message);
           });
         }
-        // GitHub Pages 分片合并：检测 .manifest，有则 fetch 分片合并为 Blob
+        // GitHub Pages: stream the existing chunks without allocating one giant Blob.
         fetch(config.dataUrl + '.manifest', {cache:'no-cache'})
           .then(function(r){ return r.ok ? r.json() : null; })
           .then(function(m){
             if (m && m.chunked) {
-              Promise.all(m.chunks.map(function(n){
-                return fetch(config.dataUrl + '.' + n).then(function(r){ return r.arrayBuffer(); });
-              })).then(function(bufs){
-                config.dataUrl = URL.createObjectURL(new Blob(bufs, {type:'application/octet-stream'}));
-                startUnity(config);
-              }).catch(function(e){ console.error('分片合并失败', e); startUnity(config); });
+              const restoreFetch = installGithubChunkTransport(config.dataUrl, m);
+              startUnity(config).finally(restoreFetch);
             } else { startUnity(config); }
           })
           .catch(function(){ startUnity(config); });
