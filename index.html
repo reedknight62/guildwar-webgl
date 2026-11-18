@@ -53,9 +53,9 @@
       var buildUrl = "Build";
       var loaderUrl = buildUrl + "/ea153e321edf23b9a40b38d65ce41d01.loader.js";
       var config = {
-        dataUrl: buildUrl + "/a685c22314a49e9c4a958c5845af1c20.data",
+        dataUrl: buildUrl + "/a685c22314a49e9c4a958c5845af1c20.data.gw2",
         frameworkUrl: buildUrl + "/52514baf647c9fe367a85fc5d3b666c2.framework.js",
-        codeUrl: buildUrl + "/8226a2c346c0379a25111a3d79ea8350.wasm",
+        codeUrl: buildUrl + "/8226a2c346c0379a25111a3d79ea8350.wasm.gw2",
         streamingAssetsUrl: "StreamingAssets",
         companyName: "CloudH",
         productName: "诸神之弈",
@@ -80,115 +80,223 @@
 
       var script = document.createElement("script");
       script.src = loaderUrl;
-      script.onload = () => {
-function installGithubChunkTransport(url, manifest) {
-  const dataUrl = new URL(url, document.baseURI).href;
+      script.onload = async () => {
+function installGithubWebTransport(resources, options = {}) {
   const originalFetch = window.fetch;
   const fetchResource = originalFetch.bind(window);
-  const size = manifest.originalSize;
-  const chunks = manifest.chunks;
-  if (!Number.isSafeInteger(size) || size <= 0 || !Array.isArray(chunks) ||
-      !chunks.length || !chunks.every(part => /^\d+$/.test(String(part)))) {
-    throw new Error('Invalid build chunk manifest');
-  }
-  const etag = '"' + new URL(dataUrl).pathname.split('/').pop() + '"';
-  const headers = {
-    'Content-Type': 'application/octet-stream',
-    'Content-Length': String(size),
-    'ETag': etag
-  };
+  const subtle = typeof crypto !== 'undefined' ? crypto.subtle : null;
+  const prefetch = Math.max(1, Math.min(4, options.prefetch || 2));
+  const cacheName = options.cacheName || 'guildwar-web-delivery-v2';
+  const stats = {resources: {}, transportReady: false, persistentReady: false,
+    engineReady: false, nativeGzip: typeof DecompressionStream === 'function', cacheName, prefetch};
+  window.__guildwarWebDelivery = stats;
+  const records = new Map();
+  let cachePromise;
 
-  function chunkFetch(input, options) {
-    const requestedUrl = input instanceof Request ? input.url : new URL(input, document.baseURI).href;
-    if (requestedUrl !== dataUrl) return fetchResource(input, options);
-    const request = new Request(input, options);
-    if (request.method !== 'GET' && request.method !== 'HEAD') return fetchResource(input, options);
+  function update() {
+    const all = Object.values(stats.resources);
+    stats.transportReady = all.length > 0 && all.every(s => s.complete);
+    stats.persistentReady = all.length > 0 && all.every(s => s.persistentReady);
+  }
+  function errorText(error) {return String(error && error.message || error).slice(0, 180);}
+  function cacheError(state, error) {
+    if (state.cacheErrors.length < 3) state.cacheErrors.push(errorText(error));
+  }
+  async function cacheFor(state) {
+    if (!subtle) {cacheError(state, 'Integrity API unavailable; using network'); return null;}
+    try {
+      if (!cachePromise) cachePromise = window.caches.open(cacheName);
+      return await cachePromise;
+    } catch (error) {cacheError(state, error); return null;}
+  }
+  async function valid(bytes, chunk) {
+    if (bytes.byteLength !== chunk.size) return false;
+    if (!subtle) return true;
+    const hash = await subtle.digest('SHA-256', bytes);
+    const hex = Array.from(new Uint8Array(hash), value => value.toString(16).padStart(2, '0')).join('');
+    return hex === chunk.sha256;
+  }
+  function decoder(state) {
+    if (typeof DecompressionStream === 'function') return new DecompressionStream('gzip');
+    const library = window.fflate;
+    if (!library || !library.Gunzip) throw new Error('Gzip decoder is unavailable');
+    state.fallbackDecoder = true;
+    let gzip;
+    return new TransformStream({
+      start(controller) {gzip = new library.Gunzip(data => {if (data.length) controller.enqueue(data);});},
+      transform(data) {gzip.push(data, false);},
+      flush() {gzip.push(new Uint8Array(), true);}
+    });
+  }
+
+  for (const item of resources) {
+    const manifest = item.manifest;
+    const url = new URL(item.url, document.baseURI).href;
+    if (!manifest || manifest.version !== 2 || manifest.encoding !== 'gzip' ||
+        !Number.isSafeInteger(manifest.originalSize) || manifest.originalSize <= 0 ||
+        !Number.isSafeInteger(manifest.compressedSize) || manifest.compressedSize <= 0 ||
+        !/^[0-9a-f]{64}$/.test(manifest.decodedSha256) ||
+        !['application/octet-stream', 'application/wasm'].includes(manifest.contentType) ||
+        !Array.isArray(manifest.chunks) || !manifest.chunks.length) throw new Error('Invalid Web delivery manifest');
+    let total = 0;
+    const names = new Set();
+    for (const part of manifest.chunks) {
+      if (!/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(part.file) || names.has(part.file) ||
+          !Number.isSafeInteger(part.size) || part.size <= 0 || part.size >= 50 * 1024 * 1024 ||
+          !/^[0-9a-f]{64}$/.test(part.sha256)) throw new Error('Invalid Web delivery chunk');
+      names.add(part.file); total += part.size;
+    }
+    if (total !== manifest.compressedSize || records.has(url) || stats.resources[item.name]) throw new Error('Inconsistent Web delivery manifest');
+    const state = {totalChunks: manifest.chunks.length, networkChunks: 0, cacheHits: 0,
+      cacheWrites: 0, cacheErrors: [], cacheCorruptions: 0, networkBytes: 0, decodedBytes: 0,
+      complete: false, persistentReady: false, fallbackDecoder: false, errors: []};
+    stats.resources[item.name] = state;
+    records.set(url, {manifest, state, cached: new Set(), stored: new Set(), disableWrites: false});
+  }
+
+  function webFetch(input, init) {
+    const url = input instanceof Request ? input.url : new URL(input, document.baseURI).href;
+    const record = records.get(url);
+    if (!record) return fetchResource(input, init);
+    const request = new Request(input, init);
+    if (!['GET', 'HEAD'].includes(request.method)) return fetchResource(input, init);
     if (request.signal.aborted) return Promise.reject(new DOMException('Aborted', 'AbortError'));
-    const conditional = request.headers.get('If-None-Match');
-    if (conditional && conditional.split(',').some(value => [etag, 'W/' + etag, '*'].includes(value.trim()))) {
+    const {manifest, state} = record;
+    const etag = '"' + manifest.decodedSha256 + '"';
+    const headers = {'Content-Type': manifest.contentType, 'Content-Length': String(manifest.originalSize), ETag: etag};
+    if ((request.headers.get('If-None-Match') || '').split(',').some(v => [etag, 'W/' + etag, '*'].includes(v.trim()))) {
       return Promise.resolve(new Response(null, {status: 304, headers}));
     }
     if (request.method === 'HEAD') return Promise.resolve(new Response(null, {headers}));
-
-    let reader = null;
+    const abort = new AbortController();
+    const relayAbort = () => abort.abort(request.signal.reason);
+    request.signal.addEventListener('abort', relayAbort, {once: true});
+    const cleanup = () => request.signal.removeEventListener('abort', relayAbort);
+    const pending = new Map();
     let next = 0;
-    let received = 0;
-    let cancelled = false;
-    const stream = new ReadableStream({
+
+    async function partBytes(index) {
+      const part = manifest.chunks[index];
+      const partUrl = new URL(part.file, new URL('.', url)).href;
+      const cache = await cacheFor(state);
+      if (cache) {
+        try {
+          const hit = await cache.match(partUrl);
+          if (hit) {
+            const bytes = await hit.arrayBuffer();
+            if (await valid(bytes, part)) {
+              record.cached.add(index); state.cacheHits = record.cached.size;
+              return new Uint8Array(bytes);
+            }
+            state.cacheCorruptions++;
+            await cache.delete(partUrl);
+          }
+        } catch (error) {cacheError(state, error);}
+      }
+      if (abort.signal.aborted) throw new DOMException('Aborted', 'AbortError');
+      state.networkChunks++;
+      const response = await fetchResource(partUrl, {
+        cache: request.cache, credentials: request.credentials, signal: abort.signal
+      });
+      if (response.status !== 200) throw new Error('Compressed build chunk failed: ' + response.status);
+      const bytes = await response.arrayBuffer();
+      state.networkBytes += bytes.byteLength;
+      if (!await valid(bytes, part)) throw new Error('Compressed build chunk integrity check failed');
+      if (cache && !record.disableWrites) {
+        try {
+          await cache.put(partUrl, new Response(bytes, {headers: {'Content-Type': 'application/octet-stream', 'Content-Length': String(part.size)}}));
+          record.stored.add(index); state.cacheWrites = record.stored.size;
+        } catch (error) {cacheError(state, error); record.disableWrites = true;}
+      }
+      return new Uint8Array(bytes);
+    }
+    function fill() {
+      for (let i = next; i < Math.min(next + prefetch, manifest.chunks.length); i++) {
+        if (!pending.has(i)) {
+          const task = partBytes(i);
+          task.catch(() => {});
+          pending.set(i, task);
+        }
+      }
+    }
+    const compressed = new ReadableStream({
       async pull(controller) {
         try {
-          while (!cancelled) {
-            if (!reader) {
-              if (next === chunks.length) {
-                if (received !== size) throw new Error('Incomplete build data');
-                controller.close();
-                return;
-              }
-              const response = await fetchResource(dataUrl + '.' + chunks[next++], {
-                cache: request.cache,
-                credentials: request.credentials,
-                signal: request.signal
-              });
-              if (cancelled) {
-                if (response.body) await response.body.cancel();
-                return;
-              }
-              if (!response.ok || !response.body) throw new Error('Build chunk request failed: ' + response.status);
-              reader = response.body.getReader();
-            }
-            const part = await reader.read();
-            if (cancelled) return;
-            if (part.done) {
-              reader.releaseLock();
-              reader = null;
-              continue;
-            }
-            received += part.value.byteLength;
-            if (received > size) throw new Error('Build data exceeds manifest size');
-            controller.enqueue(part.value);
-            return;
-          }
+          if (abort.signal.aborted) throw new DOMException('Aborted', 'AbortError');
+          if (next === manifest.chunks.length) {controller.close(); return;}
+          fill();
+          const bytes = await pending.get(next);
+          pending.delete(next++);
+          if (abort.signal.aborted) throw new DOMException('Aborted', 'AbortError');
+          controller.enqueue(bytes);
+          fill();
         } catch (error) {
-          if (reader) await reader.cancel(error).catch(() => {});
-          if (!cancelled) controller.error(error);
+          if (state.errors.length < 3) state.errors.push(errorText(error));
+          abort.abort(error); cleanup(); controller.error(error);
         }
       },
       cancel(reason) {
-        cancelled = true;
-        return reader ? reader.cancel(reason) : undefined;
+        if (reason && state.errors.length < 3) state.errors.push(errorText(reason));
+        abort.abort(reason); cleanup();
       }
     });
-    return Promise.resolve(new Response(stream, {headers}));
+    let decoded = 0;
+    const body = compressed.pipeThrough(decoder(state)).pipeThrough(new TransformStream({
+      transform(bytes, controller) {
+        decoded += bytes.byteLength; state.decodedBytes = decoded;
+        if (decoded > manifest.originalSize) throw new Error('Decoded build exceeds original size');
+        controller.enqueue(bytes);
+      },
+      flush() {
+        cleanup();
+        if (decoded !== manifest.originalSize) throw new Error('Incomplete decoded build');
+        state.complete = true;
+        state.persistentReady = new Set([...record.cached, ...record.stored]).size === manifest.chunks.length;
+        update();
+      }
+    }));
+    return Promise.resolve(new Response(body, {headers}));
   }
 
-  window.fetch = chunkFetch;
+  window.fetch = webFetch;
   return function restore() {
-    if (window.fetch === chunkFetch) window.fetch = originalFetch;
+    if (window.fetch === webFetch) window.fetch = originalFetch;
   };
 }
 
-        function startUnity(cfg) {
-          return createUnityInstance(canvas, cfg, (progress) => {
-            progressBarFull.style.width = 100 * progress + "%";
-          }).then((unityInstance) => {
-            loadingBar.style.display = "none";
-            fullscreenButton.onclick = () => {
-              unityInstance.SetFullscreen(1);
-            };
-          }).catch((message) => {
-            alert(message);
+        const delivery = {"resources": [{"name": "data", "url": "Build/a685c22314a49e9c4a958c5845af1c20.data.gw2", "manifestUrl": "Build/a685c22314a49e9c4a958c5845af1c20.data.gw2.manifest"}, {"name": "wasm", "url": "Build/8226a2c346c0379a25111a3d79ea8350.wasm.gw2", "manifestUrl": "Build/8226a2c346c0379a25111a3d79ea8350.wasm.gw2.manifest"}], "gzipFallback": "TemplateData/fflate-0.8.2-c3b34f2e9f5e74d4.js"};
+        let restoreFetch;
+        try {
+          if (typeof DecompressionStream !== 'function') {
+            await new Promise((resolve, reject) => {
+              const fallback = document.createElement('script');
+              fallback.src = delivery.gzipFallback;
+              fallback.onload = resolve;
+              fallback.onerror = () => reject(new Error('Could not load the gzip decoder'));
+              document.head.appendChild(fallback);
+            });
+          }
+          const resources = await Promise.all(delivery.resources.map(async resource => {
+            const response = await fetch(resource.manifestUrl, {cache: 'no-cache'});
+            if (!response.ok) throw new Error('Could not load Web delivery manifest: ' + response.status);
+            return {name: resource.name, url: resource.url, manifest: await response.json()};
+          }));
+          restoreFetch = installGithubWebTransport(resources, {prefetch: 2});
+          const virtualUrls = new Set(resources.map(resource => new URL(resource.url, document.baseURI).href));
+          const originalCacheControl = config.cacheControl;
+          config.cacheControl = url => virtualUrls.has(new URL(url, document.baseURI).href)
+            ? 'no-store' : typeof originalCacheControl === 'function' ? originalCacheControl(url) : 'no-store';
+          const unityInstance = await createUnityInstance(canvas, config, progress => {
+            progressBarFull.style.width = 100 * progress + '%';
           });
+          window.__guildwarWebDelivery.engineReady = true;
+          loadingBar.style.display = 'none';
+          fullscreenButton.onclick = () => unityInstance.SetFullscreen(1);
+        } catch (error) {
+          alert(error && error.message || String(error));
+        } finally {
+          if (restoreFetch) restoreFetch();
         }
-        // GitHub Pages: stream the existing chunks without allocating one giant Blob.
-        fetch(config.dataUrl + '.manifest', {cache:'no-cache'})
-          .then(function(r){ return r.ok ? r.json() : null; })
-          .then(function(m){
-            if (m && m.chunked) {
-              const restoreFetch = installGithubChunkTransport(config.dataUrl, m);
-              startUnity(config).finally(restoreFetch);
-            } else { startUnity(config); }
-          })
-          .catch(function(){ startUnity(config); });
       };
 
       document.body.appendChild(script);

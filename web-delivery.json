@@ -1,0 +1,15 @@
+{
+  "version": 2,
+  "resources": {
+    "data": {
+      "sourceUrl": "Build/a685c22314a49e9c4a958c5845af1c20.data",
+      "url": "Build/a685c22314a49e9c4a958c5845af1c20.data.gw2",
+      "manifestUrl": "Build/a685c22314a49e9c4a958c5845af1c20.data.gw2.manifest"
+    },
+    "wasm": {
+      "sourceUrl": "Build/8226a2c346c0379a25111a3d79ea8350.wasm",
+      "url": "Build/8226a2c346c0379a25111a3d79ea8350.wasm.gw2",
+      "manifestUrl": "Build/8226a2c346c0379a25111a3d79ea8350.wasm.gw2.manifest"
+    }
+  }
+}
