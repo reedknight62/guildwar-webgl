@@ -2,14 +2,14 @@
   "version": 3,
   "resources": {
     "data": {
-      "sourceUrl": "Build/3358811b45effd1fb387b69be3d7c3fc.data",
-      "url": "Build/3358811b45effd1fb387b69be3d7c3fc.data.gw3",
-      "manifestUrl": "Build/3358811b45effd1fb387b69be3d7c3fc.data.gw3.manifest"
+      "sourceUrl": "Build/730e6836b9bc2434b3f5c9916a1d52d2.data",
+      "url": "Build/730e6836b9bc2434b3f5c9916a1d52d2.data.gw3",
+      "manifestUrl": "Build/730e6836b9bc2434b3f5c9916a1d52d2.data.gw3.manifest"
     },
     "wasm": {
-      "sourceUrl": "Build/0bb348e1434e343404cddadc9a5f8597.wasm",
-      "url": "Build/0bb348e1434e343404cddadc9a5f8597.wasm.gw3",
-      "manifestUrl": "Build/0bb348e1434e343404cddadc9a5f8597.wasm.gw3.manifest"
+      "sourceUrl": "Build/fd6b919e5814bc627b079882a7749b9d.wasm",
+      "url": "Build/fd6b919e5814bc627b079882a7749b9d.wasm.gw3",
+      "manifestUrl": "Build/fd6b919e5814bc627b079882a7749b9d.wasm.gw3.manifest"
     }
   }
 }

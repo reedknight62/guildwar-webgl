@@ -1,0 +1,42 @@
+{
+  "version": 3,
+  "chunked": true,
+  "encoding": "brotli-blocks",
+  "originalSize": 28771065,
+  "compressedSize": 15167077,
+  "decodedSha256": "10c904e9e904f4d089d284d8a9faa1dac7583fa3fe2f4b68eaec5d222f19fef2",
+  "contentType": "application/octet-stream",
+  "chunkSize": 8388608,
+  "quality": 10,
+  "lgwin": 22,
+  "chunks": [
+    {
+      "file": "730e6836b9bc2434b3f5c9916a1d52d2.data.e63127c9c7c00975.br.000",
+      "size": 6935092,
+      "sha256": "e63127c9c7c00975690e5d84643a60e8e8784c39224f333477256e6bd40f263c",
+      "decodedSize": 8388608,
+      "decodedSha256": "f326ffba7a3d589a950e3f7705507414b254d961f35ac0b79cdebb689e7bde33"
+    },
+    {
+      "file": "730e6836b9bc2434b3f5c9916a1d52d2.data.7e4ab6b7273765aa.br.001",
+      "size": 5608632,
+      "sha256": "7e4ab6b7273765aa605c256c696208183c1ae8feb232d8573a8c0a5df20c97c7",
+      "decodedSize": 8388608,
+      "decodedSha256": "41bdba5a54090e26bda41c7c8fe1bd8955eac34fee0fa1ab8d3ede0c780fbd80"
+    },
+    {
+      "file": "730e6836b9bc2434b3f5c9916a1d52d2.data.3282b117e0106d20.br.002",
+      "size": 1894189,
+      "sha256": "3282b117e0106d203788922865cda55169435b4569c6e71ceb3354d02204fb17",
+      "decodedSize": 8388608,
+      "decodedSha256": "affa33d35c8be3943c557c467e7608242d9f055e4fd78ad37bfa41698e78365f"
+    },
+    {
+      "file": "730e6836b9bc2434b3f5c9916a1d52d2.data.893c9d2f4cfbcbc7.br.003",
+      "size": 729164,
+      "sha256": "893c9d2f4cfbcbc7d6df929e0e99ecb5c8bfd46a52d1bb1e404f2d59fabe51f0",
+      "decodedSize": 3605241,
+      "decodedSha256": "30c664cfec9e669de902ca8c80728e68ce9a6e1ed2baaefb0508df0f5bd29f0f"
+    }
+  ]
+}
